@@ -5,22 +5,21 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.hardware.Camera;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.annotation.RestrictTo;
-import androidx.fragment.app.Fragment;
-import android.text.SpannableString;
 import android.text.TextUtils;
-import android.text.method.LinkMovementMethod;
-import android.text.style.URLSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
-import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
+import androidx.fragment.app.Fragment;
 
 import java.io.ByteArrayOutputStream;
 
@@ -64,7 +63,7 @@ public class ScanCardFragment extends Fragment {
     private ScanCardRequest mRequest;
 
     @Override
-    public void onAttach(Context context) {
+    public void onAttach(@NonNull Context context) {
         super.onAttach(context);
         try {
             mListener = (InteractionListener) getActivity();
@@ -127,7 +126,7 @@ public class ScanCardFragment extends Fragment {
 
         mScanManager = new ScanManager(recognitionMode, getActivity(), mCameraPreviewLayout, new ScanManager.Callbacks() {
 
-            private byte mLastCardImage[] = null;
+            private byte[] mLastCardImage = null;
 
             @Override
             public void onCameraOpened(Camera.Parameters cameraParameters) {
@@ -135,7 +134,7 @@ public class ScanCardFragment extends Fragment {
                         && !cameraParameters.getSupportedFlashModes().isEmpty());
                 if (getView() == null) return;
                 mProgressBar.hideSlow();
-                mCameraPreviewLayout.setBackgroundDrawable(null);
+                mCameraPreviewLayout.setBackground(null);
                 if (mFlashButton != null) mFlashButton.setVisibility(isFlashSupported ? View.VISIBLE : View.GONE);
 
                 innitSoundPool();
@@ -163,7 +162,7 @@ public class ScanCardFragment extends Fragment {
                     }
 
                     Card card = new Card(result.getNumber(), result.getName(), date);
-                    byte cardImage[] = mLastCardImage;
+                    byte[] cardImage = mLastCardImage;
                     mLastCardImage = null;
                     finishWithResult(card, cardImage);
                 }
@@ -185,7 +184,7 @@ public class ScanCardFragment extends Fragment {
 
             @Nullable
             private byte[] compressCardImage(Bitmap img) {
-                byte result[];
+                byte[] result;
                 ByteArrayOutputStream stream = new ByteArrayOutputStream();
                 if (img.compress(Bitmap.CompressFormat.JPEG, 80, stream)) {
                     result = stream.toByteArray();
@@ -208,7 +207,7 @@ public class ScanCardFragment extends Fragment {
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
     }
 
@@ -241,7 +240,14 @@ public class ScanCardFragment extends Fragment {
 
     private void innitSoundPool() {
         if (mRequest.isSoundEnabled()) {
-            mSoundPool = new SoundPool(1, AudioManager.STREAM_SYSTEM, 0);
+            mSoundPool = new SoundPool.Builder()
+                    .setMaxStreams(1)
+                    .setAudioAttributes(
+                            new AudioAttributes.Builder()
+                                    .setLegacyStreamType(AudioManager.STREAM_SYSTEM)
+                                    .build()
+                    )
+                    .build();
             mCapturedSoundId = mSoundPool.load(getActivity(), R.raw.wocr_capture_card, 0);
         }
     }
@@ -264,12 +270,6 @@ public class ScanCardFragment extends Fragment {
                 }
             });
         }
-
-        TextView paycardsLink = (TextView)view.findViewById(R.id.wocr_powered_by_paycards_link);
-        SpannableString link = new SpannableString(getText(R.string.wocr_powered_by_pay_cards));
-        link.setSpan(new URLSpan(Constants.PAYCARDS_URL), 0, link.length(), SpannableString.SPAN_INCLUSIVE_EXCLUSIVE);
-        paycardsLink.setText(link);
-        paycardsLink.setMovementMethod(LinkMovementMethod.getInstance());
     }
 
     private void showMainContent() {
@@ -286,7 +286,7 @@ public class ScanCardFragment extends Fragment {
         if (mListener != null) mListener.onScanCardFailed(exception);
     }
 
-    private void finishWithResult(Card card, @Nullable byte cardImage[]) {
+    private void finishWithResult(Card card, @Nullable byte[] cardImage) {
         if (mListener != null) mListener.onScanCardFinished(card, cardImage);
     }
 
@@ -301,6 +301,6 @@ public class ScanCardFragment extends Fragment {
     public interface InteractionListener {
         void onScanCardCanceled(@ScanCardIntent.CancelReason int cancelReason);
         void onScanCardFailed(Exception e);
-        void onScanCardFinished(Card card, byte cardImage[]);
+        void onScanCardFinished(Card card, byte[] cardImage);
     }
 }
